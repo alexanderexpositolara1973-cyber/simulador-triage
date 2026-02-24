@@ -1,90 +1,125 @@
 import streamlit as st
 import random
 
-st.title("🚑 Simulador de Triage START")
+st.set_page_config(page_title="Simulador START Avanzado", layout="centered")
 
-st.markdown("Simulación académica para Medicina de Emergencias y Desastres")
+st.title("🚑 Simulador Académico de Triage START")
+st.markdown("Entrenamiento para Medicina de Emergencias y Desastres")
 
-# -------------------------
-# Generación coherente del paciente
-# -------------------------
+# ---------------------------------
+# Inicializar puntaje en sesión
+# ---------------------------------
 
-camina = random.choice(["Sí", "No"])
+if "puntaje" not in st.session_state:
+    st.session_state.puntaje = 0
+    st.session_state.total = 0
 
-if camina == "Sí":
-    categoria_real = "🟢 Verde"
-    paciente = {
-        "camina": camina
-    }
+# ---------------------------------
+# Generador de paciente coherente
+# ---------------------------------
 
-else:
+def generar_paciente():
+
+    camina = random.choice(["Sí", "No"])
+
+    if camina == "Sí":
+        return {
+            "camina": "Sí"
+        }, "🟢 Verde", "Paciente ambulatorio según START."
+
+    # No camina → evaluar respiración
     respira = random.choice(["Sí", "No"])
 
     if respira == "No":
-        fr = 0
-        categoria_real = "⚫ Negro"
-        paciente = {
-            "camina": camina,
-            "respira": respira,
-            "fr": fr
-        }
+        via_aerea_responde = random.choice(["Sí", "No"])
 
-    else:
-        fr = random.randint(10, 40)
+        if via_aerea_responde == "No":
+            return {
+                "camina": "No",
+                "respira": "No",
+                "respuesta_apertura_via_aerea": "No"
+            }, "⚫ Negro", "Apnea persistente tras apertura de vía aérea."
 
-        if fr > 30:
-            categoria_real = "🔴 Rojo"
         else:
-            llenado = round(random.uniform(1, 3), 1)
+            return {
+                "camina": "No",
+                "respira": "No",
+                "respuesta_apertura_via_aerea": "Sí"
+            }, "🔴 Rojo", "Respira tras apertura de vía aérea."
 
-            if llenado > 2:
-                categoria_real = "🔴 Rojo"
-            else:
-                obedece = random.choice(["Sí", "No"])
+    # Si respira
+    fr = random.randint(10, 40)
 
-                if obedece == "No":
-                    categoria_real = "🔴 Rojo"
-                else:
-                    categoria_real = "🟡 Amarillo"
+    if fr > 30:
+        return {
+            "camina": "No",
+            "respira": "Sí",
+            "FR": fr
+        }, "🔴 Rojo", "Frecuencia respiratoria mayor a 30."
 
-            paciente = {
-                "camina": camina,
-                "respira": respira,
-                "fr": fr,
-                "llenado_capilar_seg": llenado,
-                "obedece_ordenes": obedece
-            }
+    llenado = round(random.uniform(1, 3), 1)
 
-        paciente = {
-            "camina": camina,
-            "respira": respira,
-            "fr": fr
-        }
+    if llenado > 2:
+        return {
+            "camina": "No",
+            "respira": "Sí",
+            "FR": fr,
+            "llenado_capilar_seg": llenado
+        }, "🔴 Rojo", "Perfusión alterada (>2 seg)."
 
-# -------------------------
-# Mostrar datos del paciente
-# -------------------------
+    obedece = random.choice(["Sí", "No"])
 
-st.subheader("📋 Datos del Paciente")
-st.json(paciente)
+    if obedece == "No":
+        return {
+            "camina": "No",
+            "respira": "Sí",
+            "FR": fr,
+            "llenado_capilar_seg": llenado,
+            "obedece_ordenes": "No"
+        }, "🔴 Rojo", "Alteración del estado mental."
 
-# -------------------------
-# Respuesta del estudiante
-# -------------------------
+    return {
+        "camina": "No",
+        "respira": "Sí",
+        "FR": fr,
+        "llenado_capilar_seg": llenado,
+        "obedece_ordenes": "Sí"
+    }, "🟡 Amarillo", "Paciente estable no ambulatorio."
 
-st.subheader("🧠 Clasifique al paciente")
+# ---------------------------------
+# Generar nuevo paciente
+# ---------------------------------
 
-respuesta = st.radio(
-    "Seleccione la categoría de triage:",
-    ["🟢 Verde", "🟡 Amarillo", "🔴 Rojo", "⚫ Negro"]
-)
+if st.button("🔄 Generar nuevo paciente"):
+    st.session_state.paciente, st.session_state.correcta, st.session_state.explicacion = generar_paciente()
+    st.session_state.total += 1
 
-if st.button("Evaluar clasificación"):
-    if respuesta == categoria_real:
-        st.success("✅ Correcto. Clasificación adecuada según algoritmo START.")
-    else:
-        st.error(f"❌ Incorrecto. La clasificación correcta era: {categoria_real}")
+# ---------------------------------
+# Mostrar paciente si existe
+# ---------------------------------
 
-  
-    
+if "paciente" in st.session_state:
 
+    st.subheader("📋 Datos del Paciente")
+    st.json(st.session_state.paciente)
+
+    st.subheader("🧠 Clasificación")
+
+    respuesta = st.radio(
+        "Seleccione la categoría:",
+        ["🟢 Verde", "🟡 Amarillo", "🔴 Rojo", "⚫ Negro"]
+    )
+
+    if st.button("Evaluar"):
+        if respuesta == st.session_state.correcta:
+            st.success("✅ Clasificación correcta.")
+            st.session_state.puntaje += 1
+        else:
+            st.error(f"❌ Incorrecto. La correcta era: {st.session_state.correcta}")
+
+        st.info(f"Fundamento clínico: {st.session_state.explicacion}")
+
+        st.write(f"📊 Puntaje actual: {st.session_state.puntaje} / {st.session_state.total}")
+
+else:
+    st.info("Presione 'Generar nuevo paciente' para comenzar la simulación.")
